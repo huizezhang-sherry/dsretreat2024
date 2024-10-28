@@ -1,0 +1,316 @@
+---
+title: "How Good Are Your Unit Tests at Detecting unexpected outcomes in Data Analysis? "
+author: "H. Sherry Zhang " 
+institute: "University of Texas at Austin" 
+date: "2024 Oct 28"
+format: 
+  revealjs:
+    scrollable: true
+    slide-number: true
+    show-slide-number: all
+    aspectratio: 169
+    theme: serif
+    preview-links: auto
+    multiplex: true
+    pdf-separate-fragments: true
+    footer: "https://sherryzhang-dsretreat2024.netlify.app"
+# title-slide-attributes: 
+#   data-background-image: figures/logo.png
+#   data-background-size: 7%
+#   data-background-position: 98% 98%
+editor_options: 
+  chunk_output_type: console
+include-in-header:
+  - text: |
+      <style>
+      #title-slide .title {
+        font-size: 1.9em;
+      }
+      </style>
+editor: 
+  markdown: 
+    wrap: 72
+---
+
+
+```{r setup}
+#| include: false  
+library(knitr)
+opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, 
+               error = FALSE, fig.align = "center")
+
+library(tidyverse)
+library(adtoolbox)
+library(broom)
+```
+
+## Example: average 5-day step count 
+
+**Scenario**: let's collect your step count in 5 consecutive days. What would you expect the average step count to be?
+
+. . . 
+
+::: {style="font-size: 75%;"}
+  > A commonly cited number here is 8,000 - 10,000: this will be our expectation
+:::
+
+. . .
+
+::: {style="font-size: 75%;"}
+
+* Once the data is reveal to you, if the average will either
+
+    * falls *within* the range, we live happily ever after `r set.seed(123); emo::ji("happy")`
+        * e.g. `c(7319, 8309, 13676, 9212, 9388)`, mean = 9581
+    * falls *outside* the range, oops... what happened? `r set.seed(123); emo::ji("sad")`
+        * e.g. `c(4558, 13732, 6130, 6240, 3007)`, mean = 6733
+        * e.g. `c(7880, 7496, 9877, 15380, 14990)`, mean = 11125
+
+:::
+
+## [Unit tests as diagnostic tools when things fall out]{.r-fit-text} 
+
+::: {style="font-size: 80%;"}
+Whether there is ...
+:::
+
+. . .
+
+::: {style="font-size: 80%;"}
+
+**Test 1**: ... a dog currently in the dog park outside the window
+
+:::
+
+. . . 
+
+::: {style="font-size: 80%;"}
+
+**Test 2**: ... a number larger than 10,000
+
+:::
+
+. . . 
+
+::: {style="font-size: 80%;"}
+
+**Test 3**: ... any small number, say below 5,000
+
+:::
+
+. . . 
+
+::: {style="font-size: 80%;"}
+
+**Test 4**: ... any small number AND there is no big numbers, say above 13,000, to balance it out 
+
+:::
+. . .
+
+::: {style="font-size: 80%;"}
+
+For diagnosing why the result falls outside our expectation, some are useful (2, 3, 4), some are not (1), some give false positive (3), and some give false negative (2).
+
+:::
+
+. . .
+
+::: {style="font-size: 90%;"}
+
+**Is it possible to assess the quality of the tests for diagnosing the problem?** `r emo::ji("thinking")` 
+
+:::
+
+## [Simulate multiple versions of the data]{.r-fit-text} 
+
+We can simulate the data a hundred million times and generate the binary outcomes for each unit test. 
+
+<center>![](figures/simulation-sketch.png){height=400}</center>
+
+## [Criteria for measuring the quality of the tests (1/2)]{.r-fit-text}{.smaller}
+
+We need some notion of ....
+
+* **Accuracy**: the tests should signal genuine unexpected results, rather than give false positive and false negative 
+
+    * (bad) one step count is larger than 10,000 - so what .... `r set.seed(123467); emo::ji("shrug")`
+    * (bad) one step counts is smaller than 50,000 - again, so what ....🙃
+
+. . .
+
+* **Independence**: the tests should ideally be independent of each other, so that they make it easy to carry out actions to proceed
+
+. . .
+
+And then to combine them into a single metric
+
+## [Criteria for measuring the quality of the tests (2/2)]{.r-fit-text}{.smaller}
+
+::: {style="font-size: 90%;"}
+
+
+* Accuracy
+    * construct a model to predict the binary on binaries - we choose the **logic regression** 
+    * **precision**:  the proportion of unexpected (TP) out of all flagged unexpected (TP + FP) 
+    * **recall**: the proportion of unexpected (TP) out of all unexpected observations (TP + FN)
+
+:::
+
+. . . 
+
+::: {style="font-size: 90%;"}
+
+* Independence
+    * **overlapping**: mutual information - KL-distance between the joint distribution of the two variables and the product of the marginal distributions: $D\big(p(x,y) \parallel p(x)p(y)\big)$
+    * **independence** = 1 - mutual information
+
+:::
+
+. . .
+
+::: {style="font-size: 90%;"}
+
+
+* Combine accuracy and independence
+
+    * arithmetic mean: $\frac{1}{3} \big( \text{precision} + \text{recall} + \text{independence} \big)$
+    * harmonic mean: $\frac{3}{\frac{1}{\text{precision}} + \frac{1}{\text{recall}} + \frac{1}{\text{independence}}}$
+    * any other combination ...
+
+:::
+
+## [Unit tests for the step count example]{.r-fit-text}
+
+![](figures/ut0.png)
+
+## [Unit tests for the step count example]{.r-fit-text}
+
+![](figures/ut1.png)
+
+
+## [Unit tests for the step count example]{.r-fit-text} 
+
+![](figures/ut2.png)
+
+
+```{r}
+options(pillar.width = 70,pillar.bold = TRUE,  
+        pillar.min_title_chars = 5, pillar.print_max = 7)
+```
+
+## Simulate multiple step counts
+
+```{r}
+#| echo: true
+#| results: hold
+#| column: screen
+library(adtoolbox)
+step_count
+```
+
+## 
+
+```{r}
+#| echo: true
+#| results: hold
+#| code-line-numbers: "3-6"
+library(adtoolbox)
+step_count |> 
+  fit_logic_reg(response = unexpect, 
+                predictors = too_many_high_days:min_day_too_low,
+                nleaves = 4, seed = 123, penalty = 3) |> 
+  plot()
+ 
+```
+
+##
+
+```{r}
+#| echo: true
+#| results: hold
+#| code-line-numbers: "6"
+library(adtoolbox)
+step_count |> 
+  fit_logic_reg(response = unexpect, 
+                predictors = too_many_high_days:min_day_too_low,
+                nleaves = 4, seed = 123, penalty = 3) |> 
+  augment() 
+```
+
+##
+
+```{r}
+#| echo: true
+#| results: hold
+#| code-line-numbers: "7"
+library(adtoolbox)
+step_count |> 
+  fit_logic_reg(response = unexpect, 
+                predictors = too_many_high_days:min_day_too_low,
+                nleaves = 4, seed = 123, penalty = 3) |> 
+  augment() |> 
+  calc_miscla_rate(unexpect, .fitted) 
+```
+
+##
+
+```{r}
+#| echo: true
+#| results: hold
+#| code-line-numbers: "8"
+library(adtoolbox)
+step_count |> 
+  fit_logic_reg(response = unexpect,
+                predictors = too_many_high_days:min_day_too_low,
+                nleaves = 4, seed = 123, penalty = 3) |> 
+  augment() |> 
+  calc_miscla_rate(unexpect, .fitted) |>
+  calc_independence() 
+```
+
+##
+
+```{r}
+#| echo: true
+#| results: hold
+#| code-line-numbers: "9k,"
+library(adtoolbox)
+step_count |> 
+  fit_logic_reg(response = unexpect, 
+                predictors = too_many_high_days:min_day_too_low,
+                nleaves = 4, seed = 123, penalty = 3) |> 
+  augment() |> 
+  calc_miscla_rate(unexpect, .fitted) |>
+  calc_independence() |> 
+  calc_metrics(metrics = c("harmonic", "arithmetic"))
+```
+
+## Where we go from here `r emo::ji("rocket")`
+
+::: {style="font-size: 80%;"}
+
+* Compare between multiple sets of unit tests
+
+    * How would a larger/ smaller tree favored for diagnosing this problem? (The answer is **smaller**)
+    
+:::
+
+. . .
+
+::: {style="font-size: 80%;"}
+
+* Choose the cutoff values for the tests
+
+    * Would 2th lowest < 7000 a better test than 2th lowest < 8000 for `too_many_low_days`? (The answer is **yes**)
+
+:::
+
+. . .
+
+::: {style="font-size: 80%;"}
+
+* How would the simulated data affect the choice of the tests?
+
+    * If the data is generated from a different distribution, how would the tests perform? (Let's see ...)
+
+:::
